@@ -1,0 +1,10 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: go-snippets
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: snippets
+    ports:
+      - "5432:5432"

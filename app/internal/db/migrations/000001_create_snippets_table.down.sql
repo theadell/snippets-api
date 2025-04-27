@@ -1,0 +1,6 @@
+DROPTRIGGERIFEXISTStrigger_set_snippet_public_id
+  ON snippets;
+DROPFUNCTIONIFEXISTSset_snippet_public_id();
+DROPFUNCTIONIFEXISTSgenerate_snippet_id();
+DROPTABLEIFEXISTSsnippet_contents;
+DROPTABLEIFEXISTSsnippets;
