@@ -137,3 +137,10 @@ func generateEditToken() string {
 	}
 	return hex.EncodeToString(bytes)
 }
+
+func stringPtr(ns sql.NullString) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
+}

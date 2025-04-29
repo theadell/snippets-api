@@ -53,10 +53,12 @@ func (s *SnippetService) GetSnippet(w http.ResponseWriter, r *http.Request, id s
 	}
 
 	snippetDTO := SnippetResponse{
-		Content:   string(content),
-		CreatedAt: snippet.CreatedAt,
-		ExpiresAt: &snippet.ExpiresAt.Time,
-		Id:        snippet.PublicID,
+		Title:       stringPtr(snippet.Title),
+		ContentType: &snippet.ContentType,
+		Content:     string(content),
+		CreatedAt:   snippet.CreatedAt,
+		ExpiresAt:   &snippet.ExpiresAt.Time,
+		Id:          snippet.PublicID,
 	}
 
 	ok(w, snippetDTO)
@@ -192,10 +194,12 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 	}
 
 	snippetDTO := SnippetResponse{
-		Content:   string(content),
-		CreatedAt: snippet.CreatedAt,
-		ExpiresAt: &snippet.ExpiresAt.Time,
-		Id:        snippet.PublicID,
+		Title:       stringPtr(snippet.Title),
+		ContentType: &snippet.ContentType,
+		Content:     string(content),
+		CreatedAt:   snippet.CreatedAt,
+		ExpiresAt:   &snippet.ExpiresAt.Time,
+		Id:          snippet.PublicID,
 	}
 	ok(w, snippetDTO)
 }

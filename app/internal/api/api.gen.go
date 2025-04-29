@@ -66,6 +66,9 @@ type SnippetResponse struct {
 	// Content The decrypted snippet content
 	Content string `json:"content"`
 
+	// ContentType Type of the content of the snippet
+	ContentType *string `json:"contentType,omitempty"`
+
 	// CreatedAt ISO 8601 timestamp when the snippet was created
 	CreatedAt time.Time `json:"createdAt"`
 
@@ -74,6 +77,9 @@ type SnippetResponse struct {
 
 	// Id Unique identifier for the snippet
 	Id string `json:"id"`
+
+	// Title Title of the snippet
+	Title *string `json:"title,omitempty"`
 }
 
 // DeleteSnippetParams defines parameters for DeleteSnippet.
