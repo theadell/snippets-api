@@ -23,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	store, err := db.NewStore(c.DB)
+	store, err := db.NewPostgresStore(c.DB)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -10,20 +10,20 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	"snippets.adelh.dev/app/internal/db"
-	"snippets.adelh.dev/app/internal/db/gen"
+	"snippets.adelh.dev/app/internal/db/sqlc"
 	"snippets.adelh.dev/app/internal/encryption"
 )
 
 //go:generate go tool oapi-codegen -config cfg.yaml ../../../openapi-spec/openapi.yaml
 
 type SnippetService struct {
-	store *db.Store
+	store db.Store
 	enc   *encryption.Service
 }
 
 var _ ServerInterface = (*SnippetService)(nil)
 
-func New(store *db.Store, encryptionService *encryption.Service) *SnippetService {
+func New(store db.Store, encryptionService *encryption.Service) *SnippetService {
 	return &SnippetService{
 		enc:   encryptionService,
 		store: store,
@@ -96,7 +96,7 @@ func (s *SnippetService) CreateSnippet(w http.ResponseWriter, r *http.Request) {
 
 	contentType := stringValue(req.ContentType, "text/plain")
 
-	result, err := s.store.Primary().CreateSnippet(r.Context(), gen.CreateSnippetParams{
+	result, err := s.store.Primary().CreateSnippet(r.Context(), sqlc.CreateSnippetParams{
 		Title:            title,
 		ExpiresAt:        expiresAt,
 		PasswordHash:     password,
@@ -123,26 +123,9 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 
-	if snippet.ExpiresAt.Valid && snippet.ExpiresAt.Time.Before(time.Now()) {
-		notFoundError(w, r, "Snippet has expired")
-		return
-	}
-
 	if params.XEditToken != snippet.EditToken {
 		unauthorizedError(w, r, "Invalid edit token")
 		return
-	}
-
-	if snippet.PasswordHash.Valid {
-		if params.XSnippetPassword == nil {
-			unauthorizedError(w, r, "Password required")
-			return
-		}
-
-		if err := bcrypt.CompareHashAndPassword([]byte(snippet.PasswordHash.String), []byte(*params.XSnippetPassword)); err != nil {
-			unauthorizedError(w, r, "Invalid password")
-			return
-		}
 	}
 
 	var req SnippetCreateRequest
@@ -166,8 +149,8 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 
 	contentType := stringValue(req.ContentType, snippet.ContentType)
 
-	err = s.store.WithTx(r.Context(), func(q *gen.Queries) error {
-		updateParams := gen.UpdateSnippetParams{
+	err = s.store.WithTx(r.Context(), func(q sqlc.Querier) error {
+		updateParams := sqlc.UpdateSnippetParams{
 			ID:        snippet.ID,
 			Title:     title,
 			ExpiresAt: expiresAt,
@@ -178,7 +161,7 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 			return fmt.Errorf("failed to update snippet metadata: %w", err)
 		}
 
-		contentParams := gen.UpdateSnippetContentParams{
+		contentParams := sqlc.UpdateSnippetContentParams{
 			SnippetID:        snippet.ID,
 			ContentType:      contentType,
 			EncryptedContent: encryptedData,
@@ -218,7 +201,7 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 }
 
 func (s *SnippetService) DeleteSnippet(w http.ResponseWriter, r *http.Request, id string, params DeleteSnippetParams) {
-	snippet, err := s.getAndValidateSnippet(w, r, id, false)
+	snippet, err := s.getAndValidateSnippet(w, r, id, true)
 	if err != nil {
 		return
 	}
@@ -238,8 +221,8 @@ func (s *SnippetService) DeleteSnippet(w http.ResponseWriter, r *http.Request, i
 
 // getAndValidateSnippet retrieves a snippet and checks if it's valid and not expired
 // If primary is true, it uses the primary database, otherwise it uses a replica
-func (s *SnippetService) getAndValidateSnippet(w http.ResponseWriter, r *http.Request, publicID string, primary bool) (*gen.GetSnippetByPublicIDRow, error) {
-	var snippet gen.GetSnippetByPublicIDRow
+func (s *SnippetService) getAndValidateSnippet(w http.ResponseWriter, r *http.Request, publicID string, primary bool) (*sqlc.GetSnippetByPublicIDRow, error) {
+	var snippet sqlc.GetSnippetByPublicIDRow
 	var err error
 
 	if primary {

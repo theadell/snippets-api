@@ -3,7 +3,7 @@
 //   sqlc v1.29.0
 // source: queries.sql
 
-package gen
+package sqlc
 
 import (
 	"context"
@@ -38,19 +38,19 @@ RETURNING snippet_id,
 `
 
 type CreateSnippetParams struct {
-	Title            sql.NullString
-	ExpiresAt        sql.NullTime
-	PasswordHash     sql.NullString
-	EditToken        string
-	ContentType      string
-	EncryptedContent []byte
+	Title            sql.NullString `db:"title"`
+	ExpiresAt        sql.NullTime   `db:"expires_at"`
+	PasswordHash     sql.NullString `db:"password_hash"`
+	EditToken        string         `db:"edit_token"`
+	ContentType      string         `db:"content_type"`
+	EncryptedContent []byte         `db:"encrypted_content"`
 }
 
 type CreateSnippetRow struct {
-	SnippetID int32
-	PublicID  string
-	CreatedAt time.Time
-	EditToken string
+	SnippetID int32     `db:"snippet_id"`
+	PublicID  string    `db:"public_id"`
+	CreatedAt time.Time `db:"created_at"`
+	EditToken string    `db:"edit_token"`
 }
 
 // Creates a new snippet
@@ -111,17 +111,17 @@ LIMIT 1
 `
 
 type GetSnippetByPublicIDRow struct {
-	ID               int32
-	PublicID         string
-	Title            sql.NullString
-	CreatedAt        time.Time
-	ExpiresAt        sql.NullTime
-	PasswordHash     sql.NullString
-	EditToken        string
-	ViewCount        int32
-	LastEditedAt     sql.NullTime
-	ContentType      string
-	EncryptedContent []byte
+	ID               int32          `db:"id"`
+	PublicID         string         `db:"public_id"`
+	Title            sql.NullString `db:"title"`
+	CreatedAt        time.Time      `db:"created_at"`
+	ExpiresAt        sql.NullTime   `db:"expires_at"`
+	PasswordHash     sql.NullString `db:"password_hash"`
+	EditToken        string         `db:"edit_token"`
+	ViewCount        int32          `db:"view_count"`
+	LastEditedAt     sql.NullTime   `db:"last_edited_at"`
+	ContentType      string         `db:"content_type"`
+	EncryptedContent []byte         `db:"encrypted_content"`
 }
 
 // Retrieves a snippet by its public ID
@@ -167,11 +167,11 @@ LIMIT $1
 `
 
 type ListRecentSnippetsRow struct {
-	ID        int32
-	PublicID  string
-	Title     sql.NullString
-	CreatedAt time.Time
-	ExpiresAt sql.NullTime
+	ID        int32          `db:"id"`
+	PublicID  string         `db:"public_id"`
+	Title     sql.NullString `db:"title"`
+	CreatedAt time.Time      `db:"created_at"`
+	ExpiresAt sql.NullTime   `db:"expires_at"`
 }
 
 // Lists recently created snippets (for admin purposes)
@@ -181,7 +181,7 @@ func (q *Queries) ListRecentSnippets(ctx context.Context, limit int32) ([]ListRe
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListRecentSnippetsRow
+	items := []ListRecentSnippetsRow{}
 	for rows.Next() {
 		var i ListRecentSnippetsRow
 		if err := rows.Scan(
@@ -216,17 +216,17 @@ RETURNING id, public_id, created_at, last_edited_at
 `
 
 type UpdateSnippetParams struct {
-	ID           int32
-	Title        sql.NullString
-	ExpiresAt    sql.NullTime
-	PasswordHash sql.NullString
+	ID           int32          `db:"id"`
+	Title        sql.NullString `db:"title"`
+	ExpiresAt    sql.NullTime   `db:"expires_at"`
+	PasswordHash sql.NullString `db:"password_hash"`
 }
 
 type UpdateSnippetRow struct {
-	ID           int32
-	PublicID     string
-	CreatedAt    time.Time
-	LastEditedAt sql.NullTime
+	ID           int32        `db:"id"`
+	PublicID     string       `db:"public_id"`
+	CreatedAt    time.Time    `db:"created_at"`
+	LastEditedAt sql.NullTime `db:"last_edited_at"`
 }
 
 // Updates an existing snippet by ID
@@ -256,9 +256,9 @@ WHERE snippet_id = $1
 `
 
 type UpdateSnippetContentParams struct {
-	SnippetID        int32
-	ContentType      string
-	EncryptedContent []byte
+	SnippetID        int32  `db:"snippet_id"`
+	ContentType      string `db:"content_type"`
+	EncryptedContent []byte `db:"encrypted_content"`
 }
 
 // Updates the content of a snippet
