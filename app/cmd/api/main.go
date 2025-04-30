@@ -7,6 +7,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"snippets.adelh.dev/app/internal/api"
+	"snippets.adelh.dev/app/internal/cache"
 	"snippets.adelh.dev/app/internal/config"
 	"snippets.adelh.dev/app/internal/db"
 	"snippets.adelh.dev/app/internal/encryption"
@@ -27,7 +28,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	service := api.New(store, encryptionSvc)
+
+	redisCache := cache.NewRedisCache(c.Redis)
+	service := api.New(store, encryptionSvc, redisCache)
 
 	mux := http.NewServeMux()
 

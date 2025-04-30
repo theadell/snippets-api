@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"snippets.adelh.dev/app/internal/cache"
 	"snippets.adelh.dev/app/internal/db"
 	"snippets.adelh.dev/app/internal/db/sqlc"
 	"snippets.adelh.dev/app/internal/encryption"
@@ -17,21 +18,23 @@ import (
 //go:generate go tool oapi-codegen -config cfg.yaml ../../../openapi-spec/openapi.yaml
 
 type SnippetService struct {
-	store db.Store
-	enc   *encryption.Service
+	store      db.Store
+	redisCache *cache.RedisCache
+	enc        *encryption.Service
 }
 
 var _ ServerInterface = (*SnippetService)(nil)
 
-func New(store db.Store, encryptionService *encryption.Service) *SnippetService {
+func New(store db.Store, encryptionService *encryption.Service, redisCache *cache.RedisCache) *SnippetService {
 	return &SnippetService{
-		enc:   encryptionService,
-		store: store,
+		enc:        encryptionService,
+		store:      store,
+		redisCache: redisCache,
 	}
 }
 
 func (s *SnippetService) GetSnippet(w http.ResponseWriter, r *http.Request, id string, params GetSnippetParams) {
-	snippet, err := s.getAndValidateSnippet(w, r, id, false)
+	snippet, err := s.getAndValidateSnippet(w, r, id)
 	if err != nil {
 		return
 	}
@@ -120,7 +123,7 @@ func (s *SnippetService) CreateSnippet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, id string, params UpdateSnippetParams) {
-	snippet, err := s.getAndValidateSnippet(w, r, id, true)
+	snippet, err := s.getAndValidateSnippet(w, r, id)
 	if err != nil {
 		return
 	}
@@ -173,7 +176,7 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 		if err != nil {
 			return fmt.Errorf("failed to update snippet content: %w", err)
 		}
-
+		s.redisCache.Delete(r.Context(), fmt.Sprintf("snippet:%s", id))
 		return nil
 	})
 	if err != nil {
@@ -205,7 +208,7 @@ func (s *SnippetService) UpdateSnippet(w http.ResponseWriter, r *http.Request, i
 }
 
 func (s *SnippetService) DeleteSnippet(w http.ResponseWriter, r *http.Request, id string, params DeleteSnippetParams) {
-	snippet, err := s.getAndValidateSnippet(w, r, id, true)
+	snippet, err := s.getAndValidateSnippet(w, r, id)
 	if err != nil {
 		return
 	}
@@ -225,16 +228,17 @@ func (s *SnippetService) DeleteSnippet(w http.ResponseWriter, r *http.Request, i
 
 // getAndValidateSnippet retrieves a snippet and checks if it's valid and not expired
 // If primary is true, it uses the primary database, otherwise it uses a replica
-func (s *SnippetService) getAndValidateSnippet(w http.ResponseWriter, r *http.Request, publicID string, primary bool) (*sqlc.GetSnippetByPublicIDRow, error) {
+func (s *SnippetService) getAndValidateSnippet(w http.ResponseWriter, r *http.Request, publicID string) (*sqlc.GetSnippetByPublicIDRow, error) {
 	var snippet sqlc.GetSnippetByPublicIDRow
 	var err error
+	var cacheHit bool
+	cacheKey := fmt.Sprintf("snippet:%s", publicID)
 
-	if primary {
-		snippet, err = s.store.Primary().GetSnippetByPublicID(r.Context(), publicID)
-	} else {
+	cacheHit = s.redisCache.Get(r.Context(), cacheKey, &snippet)
+
+	if !cacheHit {
 		snippet, err = s.store.Replica().GetSnippetByPublicID(r.Context(), publicID)
 	}
-
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			notFoundError(w, r, "Snippet not found")
@@ -247,6 +251,10 @@ func (s *SnippetService) getAndValidateSnippet(w http.ResponseWriter, r *http.Re
 	if snippet.ExpiresAt.Valid && snippet.ExpiresAt.Time.Before(time.Now()) {
 		notFoundError(w, r, "Snippet has expired")
 		return nil, fmt.Errorf("snippet has expired")
+	}
+
+	if !cacheHit {
+		s.redisCache.Set(r.Context(), cacheKey, snippet)
 	}
 
 	return &snippet, nil

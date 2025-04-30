@@ -47,11 +47,11 @@ clean: ## Clean build artifacts
 	@echo "Cleaning build directory..."
 	rm -rf $(BUILD_DIR)
 
-dev-db: ## Start development database
+dev-db: ## Start development database and redis cache 
 	@echo "Starting development database..."
 	docker-compose -f docker-compose.dev.yml up -d
 
-db-stop: ## Stop development database
+db-stop: ## Stop development database and redis cache 
 	@echo "Stopping development database..."
 	docker-compose -f docker-compose.dev.yml down
 

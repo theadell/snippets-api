@@ -11,12 +11,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/bcrypt"
+	"snippets.adelh.dev/app/internal/cache"
+	"snippets.adelh.dev/app/internal/config"
 	"snippets.adelh.dev/app/internal/db/mocks"
 	"snippets.adelh.dev/app/internal/db/sqlc"
 	"snippets.adelh.dev/app/internal/encryption"
 )
 
 //go:generate sh -c "cd ../../.. && mockery"
+
+var redisCache = cache.NewRedisCache(config.RedisConfig{
+	Enabled: false,
+})
 
 func TestSnippetService_GetSnippet(t *testing.T) {
 	encryptionSvc, err := encryption.NewService("U2FsdGVkX1/K0w2X9/0jJeJk+nGGchmRtIpC/FP4YI0=")
@@ -114,7 +120,7 @@ func TestSnippetService_GetSnippet(t *testing.T) {
 			mockStore := mocks.NewMockStore(t)
 			mockQuerier := mocks.NewMockQuerier(t)
 
-			apiService := New(mockStore, encryptionSvc)
+			apiService := New(mockStore, encryptionSvc, redisCache)
 
 			mockStore.EXPECT().Replica().Return(mockQuerier)
 			mockQuerier.EXPECT().GetSnippetByPublicID(mock.Anything, "test-id").Return(tc.snippet, nil)
@@ -174,6 +180,7 @@ func TestSnippetService_DeleteSnippet(t *testing.T) {
 			snippet: baseSnippet,
 			setupMocks: func(s sqlc.GetSnippetByPublicIDRow, store *mocks.MockStore, mockQuerier *mocks.MockQuerier) {
 				store.EXPECT().Primary().Return(mockQuerier)
+				store.EXPECT().Replica().Return(mockQuerier)
 				mockQuerier.EXPECT().GetSnippetByPublicID(mock.Anything, "test-id").Return(s, nil)
 				mockQuerier.EXPECT().DeleteSnippetById(mock.Anything, s.ID).Return(1, nil)
 			},
@@ -185,7 +192,7 @@ func TestSnippetService_DeleteSnippet(t *testing.T) {
 			params:  DeleteSnippetParams{XEditToken: "token"},
 			snippet: baseSnippet,
 			setupMocks: func(s sqlc.GetSnippetByPublicIDRow, store *mocks.MockStore, mockQuerier *mocks.MockQuerier) {
-				store.EXPECT().Primary().Return(mockQuerier)
+				store.EXPECT().Replica().Return(mockQuerier)
 				mockQuerier.EXPECT().GetSnippetByPublicID(mock.Anything, "test-id").Return(s, sql.ErrNoRows)
 			},
 			expectedStatus: http.StatusNotFound,
@@ -196,7 +203,7 @@ func TestSnippetService_DeleteSnippet(t *testing.T) {
 			params:  DeleteSnippetParams{XEditToken: "wrong-token"},
 			snippet: baseSnippet,
 			setupMocks: func(s sqlc.GetSnippetByPublicIDRow, store *mocks.MockStore, mockQuerier *mocks.MockQuerier) {
-				store.EXPECT().Primary().Return(mockQuerier)
+				store.EXPECT().Replica().Return(mockQuerier)
 				mockQuerier.EXPECT().GetSnippetByPublicID(mock.Anything, "test-id").Return(s, nil)
 			},
 			expectedStatus: http.StatusUnauthorized,
@@ -210,7 +217,7 @@ func TestSnippetService_DeleteSnippet(t *testing.T) {
 
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodDelete, "/api/snippets/"+tt.id, nil)
-			s := &SnippetService{store: store, enc: encryptionSvc}
+			s := New(store, encryptionSvc, redisCache)
 			s.DeleteSnippet(w, r, tt.id, tt.params)
 			assert.Equal(t, tt.expectedStatus, w.Result().StatusCode)
 		})

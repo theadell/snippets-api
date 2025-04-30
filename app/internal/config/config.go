@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -11,6 +12,7 @@ type Config struct {
 	Server ServerConfig
 	DB     DBConfig
 	Enc    EncryptionConfig
+	Redis  RedisConfig
 }
 
 type ServerConfig struct {
@@ -29,6 +31,15 @@ type DBConfig struct {
 	ConnMaxLifetime time.Duration
 }
 
+type RedisConfig struct {
+	Enabled  bool
+	Addr     string
+	Password string
+	DB       int
+	TTL      time.Duration
+	Logger   *slog.Logger
+}
+
 func Load() (*Config, error) {
 	serverCfg, err := loadServerConfig()
 	if err != nil {
@@ -43,10 +54,16 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encryption config: %w", err)
 	}
+	redisCfg, err := loadRedisConfig()
+	if err != nil {
+		return nil, fmt.Errorf("redis config: %w", err)
+	}
+
 	return &Config{
 		Server: serverCfg,
 		DB:     dbCfg,
 		Enc:    encCfg,
+		Redis:  redisCfg,
 	}, nil
 }
 
@@ -119,6 +136,42 @@ func loadDBConfig() (DBConfig, error) {
 	if val := os.Getenv("DB_CONN_MAX_LIFETIME"); val != "" {
 		if duration, err := time.ParseDuration(val); err == nil {
 			config.ConnMaxLifetime = duration
+		}
+	}
+
+	return config, nil
+}
+
+func loadRedisConfig() (RedisConfig, error) {
+	config := RedisConfig{
+		Enabled:  true,
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+		TTL:      2 * time.Hour,
+	}
+
+	if addr := os.Getenv("REDIS_ADDR"); addr != "" {
+		config.Addr = addr
+	}
+
+	if disabled := os.Getenv("REDIS_DISABLED"); disabled == "true" || disabled == "1" {
+		config.Enabled = false
+	}
+
+	if password := os.Getenv("REDIS_PASSWORD"); password != "" {
+		config.Password = password
+	}
+
+	if dbStr := os.Getenv("REDIS_DB"); dbStr != "" {
+		if db, err := strconv.Atoi(dbStr); err == nil {
+			config.DB = db
+		}
+	}
+
+	if ttlStr := os.Getenv("REDIS_TTL"); ttlStr != "" {
+		if ttl, err := time.ParseDuration(ttlStr); err == nil {
+			config.TTL = ttl
 		}
 	}
 

@@ -8,3 +8,12 @@ services:
       POSTGRES_DB: snippets
     ports:
       - "5432:5432"
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 500mb
+      --maxmemory-policy allkeys-lru
